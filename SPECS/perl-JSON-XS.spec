@@ -1,8 +1,8 @@
 Name:           perl-JSON-XS
 Summary:        JSON serializing/de-serializing, done correctly and fast
 Epoch:          1
-Version:        4.03
-Release:        5%{?dist}
+Version:        4.04
+Release:        1%{?dist}
 License:        GPL+ or Artistic
 URL:            https://metacpan.org/release/JSON-XS
 Source0:        https://cpan.metacpan.org/modules/by-module/JSON/JSON-XS-%{version}.tar.gz
@@ -101,6 +101,10 @@ make test
 %{_libexecdir}/%{name}
 
 %changelog
+* Mon Sep 15 2025 Jitka Plesnikova <jplesnik@redhat.com> - 1:4.04-1
+- Update to 4.04
+- Fix CVE-2025-40928
+
 * Mon Aug 09 2021 Mohan Boddu <mboddu@redhat.com> - 1:4.03-5
 - Rebuilt for IMA sigs, glibc 2.34, aarch64 flags
   Related: rhbz#1991688
