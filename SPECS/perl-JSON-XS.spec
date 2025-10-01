@@ -2,11 +2,13 @@ Name:           perl-JSON-XS
 Summary:        JSON serializing/de-serializing, done correctly and fast
 Epoch:          1
 Version:        3.04
-Release:        3%{?dist}
+Release:        4%{?dist}
 License:        GPL+ or Artistic
 Group:          Development/Libraries
 URL:            http://search.cpan.org/dist/JSON-XS/
 Source0:        http://www.cpan.org/authors/id/M/ML/MLEHMANN/JSON-XS-%{version}.tar.gz
+# Fix for CVE-2025-40928 in upstream since 4.04
+Patch1:         JSON-XS-3.04-Fix-for-CVE-2025-40928.patch
 # Build
 BuildRequires:  coreutils
 BuildRequires:  gcc
@@ -15,6 +17,7 @@ BuildRequires:  perl-devel
 BuildRequires:  perl-generators
 BuildRequires:  perl-interpreter
 BuildRequires:  perl(Canary::Stability)
+BuildRequires:  perl(Config)
 BuildRequires:  perl(ExtUtils::MakeMaker) >= 6.76
 BuildRequires:  sed
 # Module Runtime
@@ -39,19 +42,35 @@ BuildRequires:  perl(warnings)
 Requires:       perl(:MODULE_COMPAT_%(eval "`%{__perl} -V:version`"; echo $version))
 
 %{?perl_default_filter}
-%{?perl_default_subpackage_tests}
 
 %description
 This module converts Perl data structures to JSON and vice versa. Its
 primary goal is to be correct and its secondary goal is to be fast. To
 reach the latter goal it was written in C.
 
+%package tests
+Summary:        Tests for %{name}
+BuildArch:      noarch
+Requires:       %{name} = %{?epoch:%{epoch}:}%{version}-%{release}
+Requires:       perl-Test-Harness
+
+%description tests
+Tests from %{name}. Execute them
+with "%{_libexecdir}/%{name}/test".
+
 %prep
 %setup -q -n JSON-XS-%{version}
+%patch -P1 -p1
 
 sed -i 's/\r//' t/*
-perl -pi -e 's|^#!/opt/bin/perl|#!%{__perl}|' eg/*
+perl -MConfig -pi -e 's|^#!/opt/bin/perl|$Config{startperl}|' eg/*
 chmod -c -x eg/*
+
+# Help generators to recognize Perl scripts
+for F in t/*.t; do
+    perl -i -MConfig -ple 'print $Config{startperl} if $. == 1 && !s{\A#!\s*perl}{$Config{startperl}}' "$F"
+    chmod +x "$F"
+done
 
 %build
 %{__perl} Makefile.PL INSTALLDIRS=vendor OPTIMIZE="%{optflags}" NO_PACKLIST=1
@@ -59,20 +78,39 @@ make %{?_smp_mflags}
 
 %install
 make pure_install DESTDIR=%{buildroot}
+# Install tests
+mkdir -p %{buildroot}%{_libexecdir}/%{name}
+cp -a t %{buildroot}%{_libexecdir}/%{name}
+cat > %{buildroot}%{_libexecdir}/%{name}/test << 'EOF'
+#!/bin/sh
+cd %{_libexecdir}/%{name} && exec prove -I . -j "$(getconf _NPROCESSORS_ONLN)"
+EOF
+chmod +x %{buildroot}%{_libexecdir}/%{name}/test
+# Correct permissions
 %{_fixperms} -c %{buildroot}
 
 %check
+export HARNESS_OPTIONS=j$(perl -e 'if ($ARGV[0] =~ /.*-j([0-9][0-9]*).*/) {print $1} else {print 1}' -- '%{?_smp_mflags}')
 make test
 
 %files
 %doc Changes README eg/
 %license COPYING
-%{perl_vendorarch}/*
-%exclude %dir %{perl_vendorarch}/auto
-%{_bindir}/*
-%{_mandir}/man[13]/*
+%{_bindir}/json_xs
+%{perl_vendorarch}/auto/JSON/
+%{perl_vendorarch}/JSON/
+%{_mandir}/man1/json_xs.1*
+%{_mandir}/man3/JSON::XS.3*
+%{_mandir}/man3/JSON::XS::Boolean.3*
+
+%files tests
+%{_libexecdir}/%{name}
 
 %changelog
+* Mon Sep 15 2025 Jitka Plesnikova <jplesnik@redhat.com> - 1:3.04-4
+- Resolves: RHEL-113630 - Fix CVE-2025-40928
+- Package tests
+
 * Wed Feb 21 2018 Paul Howarth <paul@city-fan.org> - 1:3.04-3
 - Specify all dependencies
 
